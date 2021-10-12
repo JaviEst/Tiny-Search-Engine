@@ -1,0 +1,11 @@
+#hash.test
+#!/bin/bash
+
+TESTFILES=test_hash_*
+
+for f in $TESTFILES ;  do
+    # If the file is an executable run the test
+    if [ -x $f ] && [ ! -d $f ]; then
+        runtest.sh "./$f"
+    fi
+done
