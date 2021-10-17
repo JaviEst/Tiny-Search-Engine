@@ -183,7 +183,7 @@ int main(){
     }
 
     char *url = (char*)qget(q_urlp);
-    // Loop thru the entire queue
+    // Loop thru the entire queue to free the url memory
     while ( url != NULL ) {
         free(url);
         url = (char*)qget(q_urlp);
