@@ -1,2 +1,0 @@
-# tse
-Tiny Search Engine
