@@ -15,6 +15,7 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <string.h>
+#include <unistd.h>
 #include "../utils/webpage.h"
 #include "../utils/queue.h"
 #include "../utils/hash.h"
@@ -131,6 +132,45 @@ bool search_url(void *elementp, const void* keyp) {
     return false;
 }
 
+//---------------------------- pagesave ----------------------------------
+// Description:   saves a fetched page
+// Inputs:        pointer to a webpage, filename designator, and
+//                directory name
+// Outputs:       content of id should have the following
+//                    (1) URL page was fetched from 
+//                    (2) depth assigned to webpage
+//                    (3) length of HTML associated with page
+//                    (4) HTML associated with page
+//------------------------------------------------------------------------
+int32_t pagesave(webpage_t *pagep, int id, char *dirname) {
+
+    char *url = webpage_getURL(pagep);
+    char *html = webpage_getHTML(pagep);
+    int html_len = webpage_getHTMLlen(pagep);
+
+    // Create name of file string
+    char* id_str = malloc(sizeof(id));
+    char* dirpath = malloc(100*sizeof(id));
+    char* filepath = malloc(100*sizeof(id));
+    sprintf(id_str, "%d", id);
+    sprintf(dirpath, "~/engs50/tse/crawler/%s", dirname);
+    sprintf(filepath, "~/engs50/tse/crawler/%s/%s", dirname, id_str);
+
+    // Check if we can access directory 
+    int success = access(dirpath, F_OK);
+    if (success == 0) {
+        // Create a file and write to it 
+        FILE *fp;
+        fp = fopen(filepath, "W");
+        fprintf(fp, "%s \n%d \n%d \n%s", url, DEPTH, html_len, html);
+        fclose(fp);
+    }
+
+    free(id_str);
+    free(dirpath);
+    free(filepath);
+    return 0;
+}
 
 int main(){
     // Create new webpage, queue, and hash
@@ -147,6 +187,11 @@ int main(){
     // Get html code
     // char *html = webpage_getHTML(page);
     // printf("Found html: %s\n", html);
+
+    // Check if file exists already
+    //if (!(check = access(id, F_OK)) {
+    //    exit(EXIT_FAILURE);
+    //};
 
     char *result;
     int32_t success;
@@ -192,6 +237,9 @@ int main(){
 
     // Print urls in the queue    
     print_web_queue(qp);
+
+    // Save the fetched webpage
+    pagesave(page, 1, "pages");
 
     // Free memory
     hclose(htp);
