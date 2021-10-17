@@ -15,12 +15,14 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <string.h>
+#include <unistd.h>
 #include "../utils/webpage.h"
 #include "../utils/queue.h"
 #include "../utils/hash.h"
 
 // Global
 char *URL = "https://thayer.github.io/engs50/";
+char *PAGES_PATH = "../pages/";
 int DEPTH = 0;
 uint32_t H_SIZE = 50;
 
@@ -131,6 +133,39 @@ bool search_url(void *elementp, const void* keyp) {
     return false;
 }
 
+//---------------------------- pagesave ----------------------------------
+// Description:   saves a fetched page
+// Inputs:        pointer to a webpage, filename designator, and
+//                directory path/name
+// Outputs:       content of id should have the following
+//                    (1) URL page was fetched from 
+//                    (2) depth assigned to webpage
+//                    (3) length of HTML associated with page
+//                    (4) HTML associated with page
+//------------------------------------------------------------------------
+int32_t pagesave(webpage_t *pagep, int id, char *dirname) {
+    char *url = webpage_getURL(pagep);
+    char *html = webpage_getHTML(pagep);
+    int html_len = webpage_getHTMLlen(pagep);
+    int depth = webpage_getDepth(pagep);
+
+    // Create name of file
+    char filepath[100] = {'\0'};
+    sprintf(filepath, "%s%d", dirname, id);
+
+    // Create a file and write to it 
+    FILE *fp;
+    fp = fopen(filepath, "w");
+
+    // Check if file has been created/opened
+    if ( fp == NULL ) {
+        return 1;
+    }
+    fprintf(fp, "%s\n%d\n%d\n%s", url, depth, html_len, html);
+    fclose(fp);
+
+    return 0;
+}
 
 int main(){
     // Create new webpage, queue, and hash
@@ -183,7 +218,7 @@ int main(){
     }
 
     char *url = (char*)qget(q_urlp);
-    // Loop thru the entire queue
+    // Loop thru the entire queue to free the url memory
     while ( url != NULL ) {
         free(url);
         url = (char*)qget(q_urlp);
@@ -192,6 +227,9 @@ int main(){
 
     // Print urls in the queue    
     print_web_queue(qp);
+
+    // Save the fetched webpage
+    pagesave(page, 1, PAGES_PATH);
 
     // Free memory
     hclose(htp);
