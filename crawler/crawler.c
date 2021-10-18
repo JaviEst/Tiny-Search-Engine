@@ -16,16 +16,15 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include "../utils/webpage.h"
-#include "../utils/queue.h"
-#include "../utils/hash.h"
+#include <webpage.h>
+#include <queue.h>
+#include <hash.h>
 
 // Global
 char *URL = "https://thayer.github.io/engs50/";
 char *PAGES_PATH = "../pages/";
 int DEPTH = 0;
 uint32_t H_SIZE = 50;
-
 
 // log one word (1-9 chars) about a given url
 inline static void logr(const char *word, const int depth, const char *url)
@@ -148,6 +147,7 @@ int32_t pagesave(webpage_t *pagep, int id, char *dirname) {
     char *html = webpage_getHTML(pagep);
     int html_len = webpage_getHTMLlen(pagep);
     int depth = webpage_getDepth(pagep);
+    // int i;
 
     // Create name of file
     char filepath[100] = {'\0'};
@@ -161,8 +161,14 @@ int32_t pagesave(webpage_t *pagep, int id, char *dirname) {
     if ( fp == NULL ) {
         return 1;
     }
-    fprintf(fp, "%s\n%d\n%d\n%s", url, depth, html_len, html);
+
+    fprintf(fp, "%s\n%d\n%d\n%s\n", url, depth, html_len, html);
     fclose(fp);
+
+    // // Print first 50 characters of html
+    // for (i=0;i<50; i++) {
+    //     fputc(*(html+i), fp);
+    // }
 
     return 0;
 }
@@ -179,9 +185,9 @@ int main(){
         exit(EXIT_FAILURE);
     }
 
-    // Get html code
+    // // Get html code
     // char *html = webpage_getHTML(page);
-    // printf("Found html: %s\n", html);
+    // fprintf(stdout, "Found html: %s\n", html);
 
     char *result;
     int32_t success;

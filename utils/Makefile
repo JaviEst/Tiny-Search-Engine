@@ -19,7 +19,7 @@ QUEUE_OBJS:=$(patsubst %.c,%.o,$(TEST_QUEUE_CFILES))
 OFILES=queue.o hash.o webpage.o
 
 all: $(OFILES)
-	 ar cr ~/engs50/tse/lib/libutils.a $(OFILES)
+	 ar cr ../lib/libutils.a $(OFILES)
 	 
 #all: $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
 
