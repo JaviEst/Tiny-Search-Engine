@@ -16,15 +16,14 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <webpage.h>
 #include <queue.h>
 #include <hash.h>
 
 // Global
-char *URL = "https://thayer.github.io/engs50/";
-char *PAGES_PATH = "../pages/";
-int DEPTH = 0;
-uint32_t H_SIZE = 50;
+uint32_t H_SIZE = 10000;
+// URL = https://thayer.github.io/engs50/ 
 
 // log one word (1-9 chars) about a given url
 inline static void logr(const char *word, const int depth, const char *url)
@@ -70,9 +69,10 @@ int url_to_queue(queue_t* qp, char* url) {
 void print_web_queue(queue_t *qp) {
     webpage_t *page = (webpage_t*)qget(qp);
     char *url = webpage_getURL(page);
+    int page_depth = webpage_getDepth(page);
     // Loop thru the entire queue
     while ( page != NULL ) {
-        logr("Internal", DEPTH, url);
+        logr("Internal", page_depth, url);
         bag_delete(page);
         page = (webpage_t*)qget(qp);
         url = webpage_getURL(page);
@@ -147,7 +147,6 @@ int32_t pagesave(webpage_t *pagep, int id, char *dirname) {
     char *html = webpage_getHTML(pagep);
     int html_len = webpage_getHTMLlen(pagep);
     int depth = webpage_getDepth(pagep);
-    // int i;
 
     // Create name of file
     char filepath[100] = {'\0'};
@@ -165,65 +164,144 @@ int32_t pagesave(webpage_t *pagep, int id, char *dirname) {
     fprintf(fp, "%s\n%d\n%d\n%s\n", url, depth, html_len, html);
     fclose(fp);
 
-    // // Print first 50 characters of html
-    // for (i=0;i<50; i++) {
-    //     fputc(*(html+i), fp);
-    // }
-
     return 0;
 }
 
-int main(){
-    // Create new webpage, queue, and hash
-    webpage_t *page = webpage_new(URL, DEPTH, NULL);
+//---------------------------- check_arg ---------------------------------
+// Description:   checking the ionputs from the user are correct
+// Inputs:        argv / argc
+// Outputs:       
+//------------------------------------------------------------------------
+
+int32_t check_arg(int argc, char** argv){
+    // Check the number of input arguments is correct
+    if ( argc != 4 ) {
+        printf("usage: crawler <seedurl> <pagedir> <maxdepth>\n");
+        return 1;
+    }
+
+    // Check if pagedir exists
+    DIR *dirp = opendir(argv[2]);
+    if ( dirp == NULL ) {
+        printf("usage: crawler <seedurl> <pagedir> <maxdepth>\n");
+        printf("<pagedir> must exist\n");
+        return 1;
+    }
+    closedir(dirp);
+
+    // Check if maxdepth is equal or greater than 0
+    long maxdepth = strtoul(argv[3], NULL, 0);
+    if ( maxdepth < 0 ) {
+        printf("usage: crawler <seedurl> <pagedir> <maxdepth>\n");
+        printf("<maxdepth> must be equal to or greater than 0\n");
+        return 1;
+    }
+    return 0;
+}
+
+int main(int argc, char** argv){
+    // Check the inputs from the user
+    int32_t correct_arg = check_arg(argc, argv);
+    if ( correct_arg != 0 ){
+        exit(EXIT_FAILURE);
+    }
+
+    // Assign arguments from command line
+    char *seed_url = argv[1];
+    char *page_dir = argv[2];
+    long max_depth = strtoul(argv[3], NULL, 0);
+
+    long depth = 0;
+
+    // Create queues and hash
     queue_t *qp = qopen();
     queue_t *q_urlp = qopen();
     hashtable_t *htp = hopen(H_SIZE);
 
-    // Checking that the fetch worked correctly
-    if( !webpage_fetch( page ) ) {
+    bool url_flag = false;          // check for url duplicate
+    // Add url to the hashtable
+    int32_t success = url_to_hash(htp, &search_url, seed_url, (const char*)seed_url, 0, &url_flag);
+    if ( success != 0 ) {
         exit(EXIT_FAILURE);
     }
 
-    // // Get html code
-    // char *html = webpage_getHTML(page);
-    // fprintf(stdout, "Found html: %s\n", html);
+    // Add webpage to the queue
+    success = web_to_queue(qp, seed_url, depth, NULL);
+    if ( success != 0 ) {
+        exit(EXIT_FAILURE);
+    }
 
-    char *result;
-    int32_t success;
-
-    bool url_flag = false;
-    int iteration = 0;
+    webpage_t *page;
+    char *result;                   // scanned url
+    char *url;
+    int first_url = 1;              // check for first entry in hashtable
+    int id = 1;                     // id in the page saved (name of the file)
     int pos = 0;
-    // Scan the html code for urls
-    while ( ( pos = webpage_getNextURL( page, pos, &result ) ) > 0 ) {
-        // Add url to queue
-        success = url_to_queue(q_urlp, result);
-        if ( success != 0 ) {
-            exit(EXIT_FAILURE);
+    int page_depth = 0;
+    
+    // Go thru all urls until max depth
+    while ( page_depth <= max_depth ) {
+        // Grab front page in the queue
+        page = (webpage_t*)qget(qp);
+
+        // Assign the right depth
+        page_depth = webpage_getDepth(page);
+        depth = page_depth + 1;
+
+        if ( page_depth > max_depth ) {
+            break;
         }
 
-        // Check if the url is internal
-        if ( IsInternalURL( result ) ) {
-            // Check if the url is in the hashtable
-            success = url_to_hash(htp, &search_url, result, (const char*)result, iteration, &url_flag);
+        // Checking that the fetch worked correctly
+        while( !webpage_fetch( page ) ) {
+            bag_delete(page);
+            // Grab front page in the queue
+            page = (webpage_t*)qget(qp);
+
+            // Assign the right depth
+            page_depth = webpage_getDepth(page);
+            depth = page_depth + 1;
+        }
+
+        // Save the fetched webpage
+        pagesave(page, id, page_dir);
+
+        // Crawl the html code for urls
+        while ( ( pos = webpage_getNextURL( page, pos, &result ) ) > 0 ) {
+            // Add url to queue
+            success = url_to_queue(q_urlp, result);
             if ( success != 0 ) {
+                printf("Second exit.\n");
                 exit(EXIT_FAILURE);
             }
 
-            // If url is not in hashtable add webpage to the queue
-            if ( url_flag ) {
-                success = web_to_queue(qp, result, DEPTH, NULL);
+            // Check if the url is internal
+            if ( IsInternalURL( result ) ) {
+                // Check if the url is in the hashtable
+                success = url_to_hash(htp, &search_url, result, (const char*)result, first_url, &url_flag);
                 if ( success != 0 ) {
+                    printf("Third exit.\n");
                     exit(EXIT_FAILURE);
                 }
-            }
-        }
-        // Update the iteration
-        iteration += 1;
-    }
 
-    char *url = (char*)qget(q_urlp);
+                // If url is not in hashtable add webpage to the queue
+                if ( url_flag ) {
+                    success = web_to_queue(qp, result, depth, NULL);
+                    if ( success != 0 ) {
+                        printf("Fourth exit.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+            }
+            first_url += 1;
+        }
+        bag_delete(page);
+        id += 1;
+        pos = 0;
+    }
+    bag_delete(page);
+
+    url = (char*)qget(q_urlp);
     // Loop thru the entire queue to free the url memory
     while ( url != NULL ) {
         free(url);
@@ -234,14 +312,10 @@ int main(){
     // Print urls in the queue    
     print_web_queue(qp);
 
-    // Save the fetched webpage
-    pagesave(page, 1, PAGES_PATH);
-
     // Free memory
     hclose(htp);
     qclose(qp);
     qclose(q_urlp);
-    bag_delete(page);
 
     exit(EXIT_SUCCESS);
 }
