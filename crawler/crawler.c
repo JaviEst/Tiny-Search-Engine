@@ -240,10 +240,7 @@ int main(int argc, char** argv){
     int page_depth = 0;
     
     // Go thru all urls until max depth
-    while ( page_depth <= max_depth ) {
-        // Grab front page in the queue
-        page = (webpage_t*)qget(qp);
-
+    while ( page_depth <= max_depth && ( page = (webpage_t*)qget(qp) ) != NULL ) {        
         // Assign the right depth
         page_depth = webpage_getDepth(page);
         depth = page_depth + 1;
@@ -266,34 +263,36 @@ int main(int argc, char** argv){
         // Save the fetched webpage
         pagesave(page, id, page_dir);
 
-        // Crawl the html code for urls
-        while ( ( pos = webpage_getNextURL( page, pos, &result ) ) > 0 ) {
-            // Add url to queue
-            success = url_to_queue(q_urlp, result);
-            if ( success != 0 ) {
-                printf("Second exit.\n");
-                exit(EXIT_FAILURE);
-            }
-
-            // Check if the url is internal
-            if ( IsInternalURL( result ) ) {
-                // Check if the url is in the hashtable
-                success = url_to_hash(htp, &search_url, result, (const char*)result, first_url, &url_flag);
+        if ( depth <= max_depth ) {
+            // Crawl the html code for urls
+            while ( ( pos = webpage_getNextURL( page, pos, &result ) ) > 0 ) {
+                // Add url to queue
+                success = url_to_queue(q_urlp, result);
                 if ( success != 0 ) {
-                    printf("Third exit.\n");
+                    printf("Second exit.\n");
                     exit(EXIT_FAILURE);
                 }
 
-                // If url is not in hashtable add webpage to the queue
-                if ( url_flag ) {
-                    success = web_to_queue(qp, result, depth, NULL);
+                // Check if the url is internal
+                if ( IsInternalURL( result ) ) {
+                    // Check if the url is in the hashtable
+                    success = url_to_hash(htp, &search_url, result, (const char*)result, first_url, &url_flag);
                     if ( success != 0 ) {
-                        printf("Fourth exit.\n");
+                        printf("Third exit.\n");
                         exit(EXIT_FAILURE);
                     }
+
+                    // If url is not in hashtable add webpage to the queue
+                    if ( url_flag ) {
+                        success = web_to_queue(qp, result, depth, NULL);
+                        if ( success != 0 ) {
+                            printf("Fourth exit.\n");
+                            exit(EXIT_FAILURE);
+                        }
+                    }
                 }
+                first_url += 1;
             }
-            first_url += 1;
         }
         bag_delete(page);
         id += 1;
