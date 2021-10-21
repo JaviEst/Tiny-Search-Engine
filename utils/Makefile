@@ -16,7 +16,7 @@ TEST_QUEUE_CFILES:=$(wildcard test_queue*.c)
 QUEUE_TARGETS:=$(patsubst %.c,%,$(TEST_QUEUE_CFILES))
 QUEUE_OBJS:=$(patsubst %.c,%.o,$(TEST_QUEUE_CFILES))
 
-OFILES=queue.o hash.o webpage.o
+OFILES=queue.o hash.o webpage.o pageio.o
 
 all: $(OFILES)
 	 ar cr ../lib/libutils.a $(OFILES)
@@ -44,6 +44,9 @@ $(HASH_OBJS) : %.o: %.c hash.h queue.h
 
 webpage.o:	webpage.c webpage.h
 			gcc $(CFLAGS) -c webpage.c
+
+pageio.o:	pageio.c pageio.h
+			gcc $(CFLAGS) -c pageio.c
 
 clean:
 	rm -rf *.o $(LIST_TARGETS) $(QUEUE_TARGETS) $(HASH_TARGETS)
