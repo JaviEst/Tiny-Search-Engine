@@ -1,6 +1,6 @@
-CFLAGS=-Wall -pedantic -std=c11 -I. -g
+CFLAGS=-Wall -pedantic -std=c11 -I../utils -L../lib -g
 CC=gcc
-LIBS=-lm
+LIBS=-lm -lutils -lcurl
 
 # get all c files whose name starts test. This is used to extract the target name
 #https://stackoverflow.com/questions/13995906/get-filename-without-extension-within-makefile
@@ -21,7 +21,7 @@ OFILES=queue.o hash.o webpage.o pageio.o
 all: $(OFILES)
 	 ar cr ../lib/libutils.a $(OFILES)
 	 
-#all: $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
+# all: test_pageio_load $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
 
 $(LIST_TARGETS) : %: %.o list.o
 	$(CC) $(CFLAGS) $< list.o -o $@ 
@@ -30,7 +30,7 @@ $(QUEUE_TARGETS) : %: %.o queue.o
 	$(CC) $(CFLAGS) $< queue.o -o $@ 
 
 $(HASH_TARGETS) : %: %.o hash.o queue.o
-	$(CC) $(CFLAGS) $< hash.o queue.o -o $@ 
+	$(CC) $(CFLAGS) $< hash.o queue.o -o $@
 
 
 $(LIST_OBJS) : %.o: %.c list.h
@@ -42,11 +42,15 @@ $(QUEUE_OBJS) : %.o: %.c queue.h
 $(HASH_OBJS) : %.o: %.c hash.h queue.h
 	$(CC) $(CFLAGS) -c $< 
 
+
 webpage.o:	webpage.c webpage.h
 			gcc $(CFLAGS) -c webpage.c
 
 pageio.o:	pageio.c pageio.h
 			gcc $(CFLAGS) -c pageio.c
 
+test_pageio_load:	
+		$(CC) $(CFLAGS) test_pageio_load.c $(LIBS) -o $@
+
 clean:
-	rm -rf *.o $(LIST_TARGETS) $(QUEUE_TARGETS) $(HASH_TARGETS)
+	rm -rf *.o test_pageio_load $(LIST_TARGETS) $(QUEUE_TARGETS) $(HASH_TARGETS)

@@ -17,6 +17,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <pageio.h>
 #include <webpage.h>
 
 //---------------------------- pagesave ----------------------------------
@@ -52,4 +53,49 @@ int32_t pagesave(webpage_t *pagep, int id, char *dirname) {
     fclose(fp);
 
     return 0;
+}
+
+
+//---------------------------- pageload -------------------------------------
+// Description:   loads a saved page
+// Inputs:        filename and directory where the file is stored
+// Outputs:       returns a webpage populated with the info in the file given
+//---------------------------------------------------------------------------
+webpage_t *pageload(int id, char *dirnm) {
+    // Create name of file
+    char filepath[100] = {'\0'};
+    sprintf(filepath, "%s%d", dirnm, id);
+
+    FILE *fp;
+    fp = fopen(filepath, "r");
+    // Check if file has been opened
+    if ( fp == NULL ) {
+        return NULL;
+    }
+
+    char url[100] = {'\0'};
+    int depth;
+    int html_len;
+    // Read first 3 lines of the file
+    fscanf(fp, "%s", url);               // read the url
+    fscanf(fp, "%d", &depth);            // read the page depth
+    fscanf(fp, "%d", &html_len);         // read the number of characters in the html page
+
+    char *html = malloc(sizeof(char)*html_len+1);
+    char c;
+    int i = 0;
+    c = fgetc(fp);
+    // Read html code
+    while ( (c = fgetc(fp)) != EOF ) {
+        if ( c > 0 || c < 127 ){
+            html[i] = c;
+        }
+        i++;
+    }
+    html[i-1] = '\0';
+    fclose(fp);
+
+    // Create webpage
+    webpage_t *page = webpage_new(url, depth, html);
+    return page;
 }
