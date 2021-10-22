@@ -30,11 +30,13 @@
 // Outputs:       the word should be lowercase
 //---------------------------------------------------------------------------
 int NormalizeWord(char *word) {
+    // Check the length is greater than 3
     if ( strlen(word) < 3 ) {
         return 0;
     }
 
     int i;
+    // Loop thru word and make every character lowercase
     for(i = 0; i < strlen(word); i++){
         if ( !isalpha(word[i]) ) {
             return 0;
