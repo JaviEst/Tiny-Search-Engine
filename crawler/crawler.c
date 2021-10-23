@@ -53,8 +53,8 @@ int web_to_queue(queue_t* qp, char* url, int depth, char* html) {
 }
 
 //---------------------------- url_to_queue ------------------------------
-// Description:   add a webpage to a queue
-// Inputs:        queue, pointer to a character (string) and depth 
+// Description:   add a url to a queue
+// Inputs:        queue, pointer to a character (string) 
 // Outputs:       queue is populated with webpage
 //------------------------------------------------------------------------
 int url_to_queue(queue_t* qp, char* url) {
