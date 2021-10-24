@@ -23,35 +23,41 @@
 #include <hash.h>
 #include <pageio.h>
 
+typedef struct document {
+    int id;
+    int instances;
+} document_t;
+
 typedef struct word {
     char *word;
-    int instances;
+    queue_t *docs;
 } word_t;
 
 // Global variables
 int HSIZE = 1000;
 int SUM;
+long ID;
 
 //---------------------------- NormalizeWord --------------------------------
 // Description:   converts a word to lowercase
 // Inputs:        pointer to a string
 // Outputs:       the word should be lowercase
 //---------------------------------------------------------------------------
-int NormalizeWord(char *word) {
+bool NormalizeWord(char *word) {
     // Check the length is greater than 3
     if ( strlen(word) < 3 ) {
-        return 0;
+        return false;
     }
 
     int i;
     // Loop thru word and make every character lowercase
     for(i = 0; i < strlen(word); i++){
         if ( !isalpha(word[i]) ) {
-            return 0;
+            return true;
         }
         word[i] = tolower(word[i]);
     }
-    return 0;
+    return true;
 }
 
 //---------------------------- word_to_queue ------------------------------
@@ -74,6 +80,16 @@ int word_struct_to_queue(queue_t* qp, word_t* word) {
     return success;
 }
 
+//------------------------ docqueue_to_queue --------------------------
+// Description:   add a doc queue to a queue
+// Inputs:        queue, doc queue
+// Outputs:       queue is populated with doc queue
+//------------------------------------------------------------------------
+int docqueue_to_queue(queue_t* qp, queue_t* docqueue) {
+    int32_t success = qput(qp, (void*)docqueue);
+    return success;
+}
+
 //---------------------------- search_word ---------------------------------
 // Description:   compare two words
 // Inputs:        void pointer to the elements and void pointer
@@ -90,14 +106,37 @@ bool search_word(void *elementp, const void *keyp) {
     return false;
 }
 
-//---------------------------- count_words ---------------------------------
+//---------------------------- search_doc ---------------------------------
+// Description:   compare two document ids
+// Inputs:        void pointer to the elements and void pointer
+//                to the key it should be compared to 
+// Outputs:       true if document found, otherwise false
+//---------------------------------------------------------------------------
+bool search_doc(void *elementp, const void *keyp) {
+    document_t *doc = (document_t*)elementp;
+    int *key = (int*)keyp;
+    
+    if ( doc->id == *key ) {
+        return true;
+    }
+    return false;
+}
+
+//---------------------------- sumwords ---------------------------------
 // Description:   counts the total instances of all words in webpage
 // Inputs:        void pointer to the element 
 // Outputs:       updates global sum
 //---------------------------------------------------------------------------
-void count_words(void *elementp) {
+void sumwords(void *elementp) {
     word_t *word = (word_t*)elementp;
-    SUM += word->instances;
+    int i;
+
+    for ( i = 1; i <= ID; i++ ) {
+        document_t *doc = (document_t*)qsearch(word->docs, &search_doc, (void*)&i);
+        if ( doc != NULL ){
+            SUM += doc->instances;
+        }
+    }
 }
 
 //---------------------------- word_to_hash ------------------------------
@@ -107,73 +146,111 @@ void count_words(void *elementp) {
 // Outputs:       hash is populated with word_t if not in hashtable
 //                or update word_t instance
 //------------------------------------------------------------------------
-int word_to_hash(hashtable_t *htp,
+int word_to_hash(hashtable_t *htp, 
                 bool (*searchfn)(void* elementp, const void* searchkeyp),
-                word_t* word, const char* key,
-                int iteration) {
-
+                word_t* word, queue_t* qqdoc, const char* key,
+                int id) {
     int32_t success;
-    // First word added to hashtable without checking
-    if ( iteration == 0 ) {
-        word->instances = 1;
 
-        success = hput(htp, (void*)word, key, sizeof(key));
-        return success;
-    }
+    // Create document 
+    document_t *doc = NULL;
 
     // Check if the word is in hashtable
-    word_t *result = (word_t*)hsearch(htp, searchfn, key, sizeof(key));
+    word_t *result = (word_t*)hsearch(htp, searchfn, key, strlen(key));
     if ( result != NULL ) {
-        // If word found, update instance count
-        result->instances += 1;
-        return 0;
+        // If word found, find respective doc
+        document_t *temp = (document_t*)qsearch(result->docs, &search_doc, (void*)&id);
+        if ( temp != NULL ){
+            temp->instances += 1;
+            return 0;
+        }
+        else {
+            // Create document
+            doc = malloc(sizeof(document_t));
+            doc->id = id;
+            doc->instances = 1;
+
+            // Add doc to document's queue
+            success = qput(result->docs, (void*)doc);
+            return success;
+        }
+        return 1;
     }
+
+    // Create documents' queue for each word
+    queue_t *docsq = qopen();
+    doc = malloc(sizeof(document_t));
+    doc->id = id;
+    doc->instances = 1;
+
+    // Add doc to document's queue
+    success = qput(docsq, (void*)doc);
+    if ( success != 0 ) {
+        exit(EXIT_FAILURE);
+    }
+
+    // Add docqueue to queue
+    success = docqueue_to_queue(qqdoc, docsq);
+    if ( success != 0 ) {
+        exit(EXIT_FAILURE);
+    }
+
+    word->docs = docsq;
+
     // Add unique word to hashtable
-    word->instances = 1;
-    success = hput(htp, (void*)word, key, sizeof(key));
+    success = hput(htp, (void*)word, key, strlen(key));
     return success;
 }
 
 
-int main(void) {
-    int id = 1;
+int main(int argc, char** argv) {
+    ID = strtoul(argv[1], NULL, 0);
     char *dirname = "../pages/";
 
-    webpage_t *page = pageload(id, dirname);
     hashtable_t *htp = hopen(HSIZE);
     queue_t *wordq = qopen();
     queue_t *struct_wordq = qopen();
+    queue_t *qqdoc = qopen();
 
+    webpage_t *page;
     char *result;
     int success;
+    bool word_flag = false;
     int pos = 0;
-    int iteration = 0;
-    // Loop thru html code and get all the words
-    while ((pos = webpage_getNextWord(page, pos, &result)) > 0) {
-        success = NormalizeWord(result);
-        if ( success != 0 ) {
-            exit(EXIT_FAILURE);
+    int i;
+    // Load up to the given id page
+    for ( i = 1; i <= ID; i++ ) {
+        page = pageload(i, dirname);
+        // Loop thru html code and get all the words
+        while ((pos = webpage_getNextWord(page, pos, &result)) > 0) {
+            word_flag = NormalizeWord(result);
+            if ( word_flag ) {
+                // Add word to queue
+                success = word_to_queue(wordq, result);
+                if ( success != 0 ) {
+                    exit(EXIT_FAILURE);
+                }
+
+                // Add word struct to queue
+                word_t *word = malloc(sizeof(word_t));
+                word->word = result;
+                word->docs = NULL;
+                success = word_struct_to_queue(struct_wordq, word);
+
+                // Add word to hash or update instances
+                success = word_to_hash(htp, &search_word, word, qqdoc, (const char*)result, i);
+            }
+            else {
+                free(result);
+            }
         }
-        // Add word to queue
-        success = word_to_queue(wordq, result);
-        if ( success != 0 ) {
-            exit(EXIT_FAILURE);
-        }
-
-        // Add word struct to queue
-        word_t *word = malloc(sizeof(word_t));
-        word->word = result;
-        word->instances = 0;
-        success = word_struct_to_queue(struct_wordq, word);
-
-        // Add word to hash or update instances
-        success = word_to_hash(htp, &search_word, word, (const char*)result, iteration);
-
-        iteration++;
+        pos = 0;
+        webpage_delete(page);
     }
+    
     // Count a sum of all instances in hashtable
     SUM = 0;
-    happly(htp, &count_words);
+    happly(htp, &sumwords);
     printf("SUM: %d\n", SUM);
 
     // Loop thru the entire queue to free the word memory
@@ -192,11 +269,24 @@ int main(void) {
     }
     free(struct_entry);
 
+    // Loop thru the entire queue to free the struct word memory
+    queue_t *docqueue = (queue_t*)qget(qqdoc);
+    while ( docqueue != NULL ) {
+        document_t *doc_entry = (document_t*)qget(docqueue);
+        while ( doc_entry != NULL ) {
+            free(doc_entry);
+            doc_entry = (document_t*)qget(docqueue);
+        }
+        free(doc_entry);
+        qclose(docqueue);
+        docqueue = (queue_t*)qget(qqdoc);
+    }
+
     // Free memory
     qclose(wordq);
     qclose(struct_wordq);
+    qclose(qqdoc);
     hclose(htp);
-    webpage_delete(page);
 
     exit(EXIT_SUCCESS);
 }
