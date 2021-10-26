@@ -41,8 +41,7 @@ int32_t pagesave(webpage_t *pagep, int id, char *dirname) {
     sprintf(filepath, "%s%d", dirname, id);
 
     // Create a file and write to it 
-    FILE *fp;
-    fp = fopen(filepath, "w");
+    FILE *fp = fopen(filepath, "w");
 
     // Check if file has been created/opened
     if ( fp == NULL ) {
@@ -66,8 +65,7 @@ webpage_t *pageload(int id, char *dirnm) {
     char filepath[100] = {'\0'};
     sprintf(filepath, "%s%d", dirnm, id);
 
-    FILE *fp;
-    fp = fopen(filepath, "r");
+    FILE *fp = fopen(filepath, "r");
     // Check if file has been opened
     if ( fp == NULL ) {
         return NULL;
