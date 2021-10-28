@@ -22,16 +22,7 @@
 #include <queue.h>
 #include <hash.h>
 #include <pageio.h>
-
-typedef struct document {
-    int id;
-    int instances;
-} document_t;
-
-typedef struct word {
-    char *word;
-    queue_t *docs;
-} word_t;
+#include <indexio.h>
 
 // Global variables
 int HSIZE = 1000;
@@ -202,10 +193,46 @@ int word_to_hash(hashtable_t *htp,
     return success;
 }
 
+//---------------------------- check_arg ---------------------------------
+// Description:   checking the inputs from the user are correct
+// Inputs:        argv / argc
+// Outputs:       0 if the input is correct nonzero if the input is 
+//------------------------------------------------------------------------
+int32_t check_arg(int argc, char** argv){
+    // Check the number of input arguments is correct
+    if ( argc != 3 ) {
+        printf("usage: indexer <pagedir> <indexnm>\n");
+        return 1;
+    }
+
+    // Check if pagedir exists
+    DIR *dirp = opendir(argv[1]);
+    if ( dirp == NULL ) {
+        printf("usage: indexer <pagedir> <indexnm>\n");
+        printf("<pagedir> must exist\n");
+        return 1;
+    }
+    closedir(dirp);
+
+    return 0;
+}
+
 
 int main(int argc, char** argv) {
-    ID = strtoul(argv[1], NULL, 0);
-    char *dirname = "../pages/";
+    // Check the inputs from the user
+    int32_t correct_arg = check_arg(argc, argv);
+    if ( correct_arg != 0 ){
+        exit(EXIT_FAILURE);
+    }
+    int id = 1;
+
+    // Get inputs from user
+    char *pagedir = argv[1];
+    char *indexdir_filepath = argv[2];
+
+    // Create path to pages file
+    char pagedir_file[50] = {'\0'};
+    sprintf(pagedir_file, "%s%d", pagedir, id);
 
     hashtable_t *htp = hopen(HSIZE);
     queue_t *wordq = qopen();
@@ -217,10 +244,9 @@ int main(int argc, char** argv) {
     int success;
     bool word_flag = false;
     int pos = 0;
-    int i;
     // Load up to the given id page
-    for ( i = 1; i <= ID; i++ ) {
-        page = pageload(i, dirname);
+    while ( access( pagedir_file, F_OK ) == 0 ) {
+        page = pageload(id, pagedir);
         // Loop thru html code and get all the words
         while ((pos = webpage_getNextWord(page, pos, &result)) > 0) {
             word_flag = NormalizeWord(result);
@@ -238,7 +264,7 @@ int main(int argc, char** argv) {
                 success = word_struct_to_queue(struct_wordq, word);
 
                 // Add word to hash or update instances
-                success = word_to_hash(htp, &search_word, word, qqdoc, (const char*)result, i);
+                success = word_to_hash(htp, &search_word, word, qqdoc, (const char*)result, id);
             }
             else {
                 free(result);
@@ -246,12 +272,19 @@ int main(int argc, char** argv) {
         }
         pos = 0;
         webpage_delete(page);
+
+        // Get next file
+        id++;
+        sprintf(pagedir_file, "%s%d", pagedir, id);
     }
+
+    // Save index to a file
+    success = indexsave(htp, indexdir_filepath);
     
     // Count a sum of all instances in hashtable
-    SUM = 0;
-    happly(htp, &sumwords);
-    printf("SUM: %d\n", SUM);
+    // SUM = 0;
+    // happly(htp, &sumwords);
+    // printf("SUM: %d\n", SUM);
 
     // Loop thru the entire queue to free the word memory
     char *word_entry = (char*)qget(wordq);

@@ -16,12 +16,12 @@ TEST_QUEUE_CFILES:=$(wildcard test_queue*.c)
 QUEUE_TARGETS:=$(patsubst %.c,%,$(TEST_QUEUE_CFILES))
 QUEUE_OBJS:=$(patsubst %.c,%.o,$(TEST_QUEUE_CFILES))
 
-OFILES=queue.o hash.o webpage.o pageio.o
+OFILES=queue.o hash.o webpage.o pageio.o indexio.o
 
-all: $(OFILES)
-	 ar cr ../lib/libutils.a $(OFILES)
+# all: $(OFILES)
+# 	 ar cr ../lib/libutils.a $(OFILES)
 	 
-# all: test_pageio_load $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
+all: test_indexio #test_pageio_load $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
 
 $(LIST_TARGETS) : %: %.o list.o
 	$(CC) $(CFLAGS) $< list.o -o $@ 
@@ -49,8 +49,14 @@ webpage.o:	webpage.c webpage.h
 pageio.o:	pageio.c pageio.h
 			gcc $(CFLAGS) -c pageio.c
 
+indexio.o:	indexio.c indexio.h
+			gcc $(CFLAGS) -c indexio.c
+
 test_pageio_load:	
 		$(CC) $(CFLAGS) test_pageio_load.c $(LIBS) -o $@
 
+test_indexio:	
+		$(CC) $(CFLAGS) test_indexio.c $(LIBS) -o $@
+
 clean:
-	rm -rf *.o test_pageio_load $(LIST_TARGETS) $(QUEUE_TARGETS) $(HASH_TARGETS)
+	rm -rf *.o test_indexio test_pageio_load $(LIST_TARGETS) $(QUEUE_TARGETS) $(HASH_TARGETS)

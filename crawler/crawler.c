@@ -134,11 +134,10 @@ bool search_url(void *elementp, const void* keyp) {
 }
 
 //---------------------------- check_arg ---------------------------------
-// Description:   checking the ionputs from the user are correct
+// Description:   checking the inputs from the user are correct
 // Inputs:        argv / argc
 // Outputs:       
 //------------------------------------------------------------------------
-
 int32_t check_arg(int argc, char** argv){
     // Check the number of input arguments is correct
     if ( argc != 4 ) {

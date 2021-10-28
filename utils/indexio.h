@@ -13,7 +13,18 @@
 #include <string.h>
 #include <inttypes.h>
 #include <unistd.h>
+#include <queue.h>
 #include <hash.h>
+
+typedef struct document {
+    int id;
+    int instances;
+} document_t;
+
+typedef struct word {
+    char *word;
+    queue_t *docs;
+} word_t;
 
 /*
  * indexsave -- save the hashtable entries to a file called indexnm
