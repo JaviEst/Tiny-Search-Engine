@@ -241,8 +241,7 @@ int main(void) {
         char **query = parse_string(array_words, buffer, &flag, &num_words);
         if ( query == NULL && flag == false) {
             printf("[invalid query]\n> ");
-            free_array(query, num_words);
-            free(array_words);
+            free_array(array_words, num_words);
             continue;
         }
         if ( query == NULL && flag == true) {
