@@ -16,12 +16,12 @@ TEST_QUEUE_CFILES:=$(wildcard test_queue*.c)
 QUEUE_TARGETS:=$(patsubst %.c,%,$(TEST_QUEUE_CFILES))
 QUEUE_OBJS:=$(patsubst %.c,%.o,$(TEST_QUEUE_CFILES))
 
-OFILES=queue.o hash.o webpage.o pageio.o indexio.o
+OFILES=queue.o hash.o webpage.o pageio.o indexio.o query_indexer.o
 
-# all: $(OFILES)
-# 	 ar cr ../lib/libutils.a $(OFILES)
+all: $(OFILES)
+	 ar cr ../lib/libutils.a $(OFILES)
 	 
-all: test_indexio #test_pageio_load $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
+# all: test_indexio #test_pageio_load $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
 
 $(LIST_TARGETS) : %: %.o list.o
 	$(CC) $(CFLAGS) $< list.o -o $@ 
@@ -42,6 +42,8 @@ $(QUEUE_OBJS) : %.o: %.c queue.h
 $(HASH_OBJS) : %.o: %.c hash.h queue.h
 	$(CC) $(CFLAGS) -c $< 
 
+query_indexer.o: query_indexer.c
+				 gcc $(CFLAGS) -c query_indexer.c
 
 webpage.o:	webpage.c webpage.h
 			gcc $(CFLAGS) -c webpage.c

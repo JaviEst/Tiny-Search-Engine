@@ -16,14 +16,12 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include <dirent.h>
 #include <ctype.h>
 #include <webpage.h>
 #include <queue.h>
 #include <hash.h>
 #include <pageio.h>
 #include <indexio.h>
-#include <query_indexer.c>
 
 static int BUFF_SIZE = 1000;
 int MAX_RANK = 0;
@@ -34,37 +32,37 @@ typedef struct rank {
     char *url;
 } rank_t;
 
-// //---------------------------- search_word ---------------------------------
-// // Description:   compare two words
-// // Inputs:        void pointer to the elements and void pointer
-// //                to the key it should be compared to 
-// // Outputs:       true if word found, otherwise false
-// //---------------------------------------------------------------------------
-// bool search_word(void *elementp, const void *keyp) {
-//     word_t *word = (word_t*)elementp;
-//     char *key = (char*)keyp;
+//---------------------------- search_word ---------------------------------
+// Description:   compare two words
+// Inputs:        void pointer to the elements and void pointer
+//                to the key it should be compared to 
+// Outputs:       true if word found, otherwise false
+//---------------------------------------------------------------------------
+bool search_word(void *elementp, const void *keyp) {
+    word_t *word = (word_t*)elementp;
+    char *key = (char*)keyp;
     
-//     if ( strcmp(word->word, key) == 0 ) {
-//         return true;
-//     }
-//     return false;
-// }
+    if ( strcmp(word->word, key) == 0 ) {
+        return true;
+    }
+    return false;
+}
 
-// //---------------------------- search_doc ---------------------------------
-// // Description:   compare two document ids
-// // Inputs:        void pointer to the elements and void pointer
-// //                to the key it should be compared to 
-// // Outputs:       true if document found, otherwise false
-// //---------------------------------------------------------------------------
-// bool search_doc(void *elementp, const void *keyp) {
-//     document_t *doc = (document_t*)elementp;
-//     int *key = (int*)keyp;
+//---------------------------- search_doc ---------------------------------
+// Description:   compare two document ids
+// Inputs:        void pointer to the elements and void pointer
+//                to the key it should be compared to 
+// Outputs:       true if document found, otherwise false
+//---------------------------------------------------------------------------
+bool search_doc(void *elementp, const void *keyp) {
+    document_t *doc = (document_t*)elementp;
+    int *key = (int*)keyp;
     
-//     if ( doc->id == *key ) {
-//         return true;
-//     }
-//     return false;
-// }
+    if ( doc->id == *key ) {
+        return true;
+    }
+    return false;
+}
 
 //-------------------------------- find_max ---------------------------------
 // Description:   find highest rank in the queue
@@ -258,10 +256,11 @@ char** process_ands(char **query, char **and_sequence, int num_words, int *itera
 //                NULL if there is an error
 //---------------------------------------------------------------------------
 queue_t* find_doc_rank(hashtable_t *htp, queue_t *rankqp, char *pagesdir, int id, 
-                       int num_words, char **query, int *num_ranked_docs, bool *word_flag) {
+                       int num_words, char **query, int *num_ranked_docs) {
     int k;
     char *word;
     int curr_instances;
+    bool word_flag;
     int32_t success;
 
     int query_rank = 1000;
@@ -270,7 +269,7 @@ queue_t* find_doc_rank(hashtable_t *htp, queue_t *rankqp, char *pagesdir, int id
     sprintf(filepath, "%s%d", pagesdir, id);
     // Loop through crawled pages 
     while ( access(filepath, F_OK) == 0 ) {
-        *word_flag = true;
+        word_flag = true;
 
         // Loop thru query word by word
         for ( k = 0; k < num_words; k++ ) {
@@ -290,16 +289,16 @@ queue_t* find_doc_rank(hashtable_t *htp, queue_t *rankqp, char *pagesdir, int id
                 }
                 else {
                     // If they aren't then set the flag to false
-                    *word_flag = false;
+                    word_flag = false;
                 }
             }
             else {
-                *word_flag = false;
+                word_flag = false;
             }
         }
 
         // If all the words in the query were present in the page then
-        if ( *word_flag ) {
+        if ( word_flag ) {
             // Initialize ranking of a document containing all words
             rank_t *temp_rank = malloc(sizeof(rank_t));
             temp_rank->id = id;
@@ -330,48 +329,11 @@ queue_t* find_doc_rank(hashtable_t *htp, queue_t *rankqp, char *pagesdir, int id
     return rankqp;
 }
 
-//---------------------------- check_arg ---------------------------------
-// Description:   checking the inputs from the user are correct
-// Inputs:        argv / argc
-// Outputs:       0 if the input is correct nonzero if the input is 
-//------------------------------------------------------------------------
-int32_t check_arg(int argc, char** argv){
-    // Check the number of input arguments is correct
-    if ( argc < 3 || argc > 4 ) {
-        printf("usage: query <pageDirectory> <indexFile> [-q]\n");
-        return 1;
-    }
 
-    // Check if pagedir exists
-    DIR *dirp = opendir(argv[1]);
-    if ( dirp == NULL ) {
-        printf("usage: query <pageDirectory> <indexFile> [-q]\n");
-        printf("<pageDirectory> must exist\n");
-        return 1;
-    }
-    closedir(dirp);
-
-    return 0;
-}
-
-
-
-int main(int argc, char** argv) {
-    // Check the inputs from the user
-    int32_t correct_arg = check_arg(argc, argv);
-    if ( correct_arg != 0 ){
-        exit(EXIT_FAILURE);
-    }
-
-    // Get inputs from user
-    char *pagesdir = argv[1];
-    char *filepath = argv[2];
-
-
+int main(void) {
     char *buffer = calloc(BUFF_SIZE, BUFF_SIZE);
     char input[BUFF_SIZE];
     bool flag;
-    bool word_flag;
     int i, j;
     int id;
     int iteration;
@@ -380,8 +342,8 @@ int main(int argc, char** argv) {
     int num_ranked_docs;
     int32_t success;
 
-    // Create index
-    success = indexer(pagesdir, filepath);
+    char *filepath = "../index/indexnm";
+    char *pagesdir = "../pages/";
 
     // Load index 
     hashtable_t *htp = indexload(filepath);
@@ -395,10 +357,6 @@ int main(int argc, char** argv) {
     // Prompt user for input until EOF / CTRL+D
     printf("> ");
     while ( fgets(input, BUFF_SIZE, stdin) != NULL ) {
-        // if ( feof(stdin) ) {
-        //     printf("\n> ");
-        //     continue;
-        // }
         i = 0;
         id = 1;
         iteration = 0;
@@ -439,8 +397,7 @@ int main(int argc, char** argv) {
 
             // Find ranks of documents containing all the queried words
             queue_t *rankqp = qopen();
-            rankqp = find_doc_rank(htp, rankqp, pagesdir, id, num_elements, and_sequence, &num_ranked_docs, &word_flag);
-            // if ( !word_flag )
+            rankqp = find_doc_rank(htp, rankqp, pagesdir, id, num_elements, and_sequence, &num_ranked_docs);
             if ( rankqp == NULL ) {
                 exit(EXIT_FAILURE);
             }
@@ -476,10 +433,6 @@ int main(int argc, char** argv) {
             else {
                 // Concat initial <andsequence> to final ranking
                 qconcat(final_rank, rankqp);
-                // Close second queue when empty 
-                if ( num_ranked_docs == 0 ) {
-                    qclose(rankqp);
-                }
             }
             i++;
             free_array(and_sequence, num_elements);
