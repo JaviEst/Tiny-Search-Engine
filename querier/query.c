@@ -92,6 +92,21 @@ bool find_highest_rank(void *elementp, const void *keyp) {
     return false;
 }
 
+//-------------------------- find_ranked_id ---------------------------------
+// Description:   find document with the highest rank
+// Inputs:        
+// Outputs:       
+//---------------------------------------------------------------------------
+bool find_ranked_id(void *elementp, const void *keyp) {
+    rank_t *doc = (rank_t*)elementp;
+    int *id = (int*)keyp;
+    
+    if ( doc->id == *id ) {
+        return true;
+    }
+    return false;
+}
+
 //---------------------------- free_h_elements ------------------------------
 // Description:   Free the memory allocates to the elements in the hashtable
 // Inputs:        void pointer to the element 
@@ -146,7 +161,8 @@ int32_t get_doc_url(char *url, char *filepath) {
 
 //---------------------------- parse_string ---------------------------------
 // Description:   parses thru input query to verify and normalize characters
-// Inputs:        input query (string) & memory flag (bool)
+// Inputs:        array of words (parsed query), input query (string), memory flag (bool)
+//                pointer to number of words in query
 // Outputs:       returns a queue of normalized strings
 //                  - flag = true if input query is valid
 //                  - flag = false if input query is not valid
@@ -154,6 +170,7 @@ int32_t get_doc_url(char *url, char *filepath) {
 char** parse_string(char** array_words, char *input, bool *flag, int *num_elements) {
     char *delim = " \t\n";
     int i;
+    int j = 0;
 
     // Loop thru input query string by string
     char *token = strtok(input, delim);
@@ -168,16 +185,36 @@ char** parse_string(char** array_words, char *input, bool *flag, int *num_elemen
             token[i] = tolower(token[i]);
         }
 
-        // Ignore word if it is AND or OR
-        if ( strcmp(token, "and") != 0 && strcmp(token, "or") != 0 ) {
-            // Add each word in the query to an array of strings
-            array_words[(*num_elements)] = malloc((strlen(token)+1)*sizeof(char));
-            strcpy(array_words[(*num_elements)], token);
-            (*num_elements)++;
+        // If first word is AND or OR, invalid query
+        if ( ( strcmp(token, "and") == 0 || strcmp(token, "or") == 0 )
+             && j == 0 ) {
+            *flag = false;
+            return NULL;
+        }
+
+        // Add each word in the query to an array of strings
+        array_words[(*num_elements)] = malloc((strlen(token)+1)*sizeof(char));
+        strcpy(array_words[(*num_elements)], token);
+        (*num_elements)++;
+
+        // Check previous word and current word for adjacent operators
+        if ( j > 0 ) {
+            if ( ( (strcmp(array_words[j], "and") == 0) || (strcmp(array_words[j], "or") == 0) )
+                      && ( (strcmp(array_words[j-1], "and") == 0) || (strcmp(array_words[j-1], "or") == 0) ) ) {
+                *flag = false;
+                return NULL;    
+            }
         }
 
         // Get next token/string in the input query
         token = strtok(NULL, delim);
+        j++;
+    }
+    // If last word is AND or OR, invalid query
+    if ( strcmp(array_words[(*num_elements)-1], "and") == 0 
+         || strcmp(array_words[(*num_elements)-1], "or") == 0 ) {
+        *flag = false;
+        return NULL;
     }
 
     for ( i = 0; i < *num_elements; i++) {
@@ -188,23 +225,125 @@ char** parse_string(char** array_words, char *input, bool *flag, int *num_elemen
     return array_words;
 }
 
+//---------------------------- process_ands ---------------------------------
+// Description:   parses thru input query and returns <andsequence> 
+// Inputs:        query, and_sequence, pointer to number of words in query, iteration
+// Outputs:       array of strings, subarray of query if 'or' is found
+//                NULL if there is an error
+//---------------------------------------------------------------------------
+char** process_ands(char **query, char **and_sequence, int num_words, int *iteration, int *num_elements) {
+    // Loop thru query and return and sequence 
+    for ( ; *iteration < num_words; (*iteration)++) {
+        
+        if ( strcmp(query[*iteration], "or" ) == 0 ) {
+            (*iteration)++;
+            return and_sequence;
+        }
+
+        // Add each word in the query to an array of strings
+        and_sequence[(*num_elements)] = malloc((strlen(query[*iteration])+1)*sizeof(char));
+        strcpy(and_sequence[(*num_elements)], query[*iteration]);
+        (*num_elements)++;
+    }
+    return and_sequence;
+}
+
+//---------------------------- find_doc_rank ---------------------------------
+// Description:   parses thru input query and finds ranks of documents 
+//                containing all the queried words
+// Inputs:       
+// Outputs:       queue of ranks and (number of elements in queue)
+//                NULL if there is an error
+//---------------------------------------------------------------------------
+queue_t* find_doc_rank(hashtable_t *htp, queue_t *rankqp, char *pagesdir, int id, 
+                       int num_words, char **query, int *num_ranked_docs) {
+    int k;
+    char *word;
+    int curr_instances;
+    bool word_flag;
+    int32_t success;
+
+    int query_rank = 1000;
+
+    char filepath[50] = {'\0'};
+    sprintf(filepath, "%s%d", pagesdir, id);
+    // Loop through crawled pages 
+    while ( access(filepath, F_OK) == 0 ) {
+        word_flag = true;
+
+        // Loop thru query word by word
+        for ( k = 0; k < num_words; k++ ) {
+            word = query[k];
+            // Search for word in indexer
+            word_t *result = (word_t*)hsearch(htp, &search_word, word, strlen(word));
+            if ( result != NULL ) {
+                // Check if the words in the query are all present in the same document
+                document_t *doc = (document_t*)qsearch(result->docs, &search_doc, (void*)&id);
+                if ( doc != NULL ) {
+                    // If they are then find the query rank
+                    curr_instances = doc->instances;
+                    // Update query rank if there is a new minimum count value
+                    if ( curr_instances < query_rank ) {
+                        query_rank = curr_instances;
+                    }
+                }
+                else {
+                    // If they aren't then set the flag to false
+                    word_flag = false;
+                }
+            }
+            else {
+                word_flag = false;
+            }
+        }
+
+        // If all the words in the query were present in the page then
+        if ( word_flag ) {
+            // Initialize ranking of a document containing all words
+            rank_t *temp_rank = malloc(sizeof(rank_t));
+            temp_rank->id = id;
+            temp_rank->doc_rank = query_rank;
+
+            char *url = malloc(100*sizeof(char));
+            success = get_doc_url(url, filepath);
+            if ( success != 0 ) {
+                printf("Failed getting url from crawler file!\n");
+                return NULL;
+            }
+            temp_rank->url = url;
+
+            // Add ranked document to a queue of ranked documents
+            success = qput(rankqp, (void*)temp_rank);
+            if ( success != 0 ) {
+                printf("Failed adding element to queue of rankings!\n");
+                return NULL;
+            }
+            (*num_ranked_docs)++;
+        }
+        query_rank = 1000;
+        id++;
+
+        // Update the filepath with the new filename (id)
+        sprintf(filepath, "%s%d", pagesdir, id);
+    }
+    return rankqp;
+}
+
 
 int main(void) {
     char *buffer = calloc(BUFF_SIZE, BUFF_SIZE);
     char input[BUFF_SIZE];
-    char *word;
     bool flag;
-    bool word_flag;
-    int curr_instances;
-    int32_t success;
-    int j, k;
+    int i, j;
+    int id;
+    int iteration;
     int num_words;
+    int num_elements;
     int num_ranked_docs;
+    int32_t success;
 
     char *filepath = "../index/indexnm";
     char *pagesdir = "../pages/";
-    int query_rank = 1000;
-    int id;
 
     // Load index 
     hashtable_t *htp = indexload(filepath);
@@ -213,12 +352,14 @@ int main(void) {
     }
 
     // Initialize queue of documents that contain all the words in the query
-    queue_t *rankqp = qopen();
+    queue_t *final_rank = qopen();
 
     // Prompt user for input until EOF / CTRL+D
     printf("> ");
     while ( fgets(input, BUFF_SIZE, stdin) != NULL ) {
+        i = 0;
         id = 1;
+        iteration = 0;
         num_words = 0;
         num_ranked_docs = 0;
         flag = true;
@@ -248,82 +389,71 @@ int main(void) {
             exit(EXIT_FAILURE);
         }
 
-        char filepath[50] = {'\0'};
-        sprintf(filepath, "%s%d", pagesdir, id);
-        // Loop until there are no more pages crawled
-        while ( access(filepath, F_OK) == 0 ) {
-            word_flag = true;
+        while ( iteration <= num_words-1 ) {
+            num_elements = 0;
+            char **and_sequence = malloc(20*sizeof(char*));
+            // Get <andsequence> from query
+            and_sequence = process_ands(query, and_sequence, num_words, &iteration, &num_elements);
 
-            // Loop thru query word by word
-            for ( k = 0; k < num_words; k++ ) {
-                word = query[k];
-                // Search for word in indexer
-                word_t *result = (word_t*)hsearch(htp, &search_word, word, strlen(word));
-                if ( result != NULL ) {
-                    // Check if the words in the query are all present in the same document
-                    document_t *doc = (document_t*)qsearch(result->docs, &search_doc, (void*)&id);
-                    if ( doc != NULL ) {
-                        // If they are then find the query rank
-                        curr_instances = doc->instances;
-                        // printf("%s:%d ", word, curr_instances);
-                        // Update query rank if there is a new minimum count value
-                        if ( curr_instances < query_rank ) {
-                            query_rank = curr_instances;
+            // Find ranks of documents containing all the queried words
+            queue_t *rankqp = qopen();
+            rankqp = find_doc_rank(htp, rankqp, pagesdir, id, num_elements, and_sequence, &num_ranked_docs);
+            if ( rankqp == NULL ) {
+                exit(EXIT_FAILURE);
+            }
+            
+            // Conditions for or sequences
+            if ( i > 0 ) {
+                // Get doc from new <andsequence> ranking
+                rank_t *and_sequence_doc = (rank_t*)qget(rankqp);
+                // printf("");
+                while ( and_sequence_doc != NULL ) {
+                    // Compare new <andsequence> doc ids to final ranking doc ids  
+                    rank_t *final_doc_rank = (rank_t*)qsearch(final_rank, &find_ranked_id, (void*)&and_sequence_doc->id);
+                    if ( final_doc_rank != NULL ) {
+                        // Update final ranking for each doc that is in both and sequences
+                        final_doc_rank->doc_rank += and_sequence_doc->doc_rank;
+
+                        // Free memory
+                        free(and_sequence_doc->url);
+                        free(and_sequence_doc);
+                    }
+                    else if ( final_doc_rank == NULL ) {
+                        // Add unique doc from new <andsequence> to final ranking
+                        success = qput(final_rank, (void*)and_sequence_doc);
+                        if ( success != 0 ) {
+                            printf("Failed adding element to final rank queue!");
+                            exit(EXIT_FAILURE);
                         }
                     }
-                    else {
-                        // If they aren't then set the flag to false
-                        word_flag = false;
-                    }
+                    and_sequence_doc = (rank_t*)qget(rankqp);
                 }
-                else {
-                    word_flag = false;
-                }
+                qclose(rankqp);
             }
-            // If all the words in the query were present in the page then
-            if ( word_flag ) {
-                // Initialize ranking of a document containing all words
-                rank_t *temp_rank = malloc(sizeof(rank_t));
-                temp_rank->id = id;
-                temp_rank->doc_rank = query_rank;
-
-                char *url = malloc(100*sizeof(char));
-                success = get_doc_url(url, filepath);
-                if ( success != 0 ) {
-                    printf("Failed getting url from crawler file!\n");
-                    exit(EXIT_FAILURE);
-                }
-                temp_rank->url = url;
-
-                // Add ranked document to a queue of ranked documents
-                success = qput(rankqp, (void*)temp_rank);
-                if ( success != 0 ) {
-                    printf("Failed adding element to queue of rankings!\n");
-                    exit(EXIT_FAILURE);
-                }
-                num_ranked_docs++;
+            else {
+                // Concat initial <andsequence> to final ranking
+                qconcat(final_rank, rankqp);
             }
-            query_rank = 1000;
-            id++;
-
-            // Update the filepath with the new filename (id)
-            sprintf(filepath, "%s%d", pagesdir, id);
+            i++;
+            free_array(and_sequence, num_elements);
         }
+
+
         // Print the queue sorted
         j = 0;
         while ( j < num_ranked_docs ) {
             MAX_RANK = 0;
-            qapply(rankqp, &find_max);
-            rank_t *temp_rank = (rank_t*)qremove(rankqp, &find_highest_rank, &MAX_RANK);
+            qapply(final_rank, &find_max);
+            rank_t *temp_rank = (rank_t*)qremove(final_rank, &find_highest_rank, &MAX_RANK);
             while ( temp_rank != NULL ) {
-                j++;
                 printf("rank: %d doc: %d url: %s", temp_rank->doc_rank, temp_rank->id, temp_rank->url);
 
                 free(temp_rank->url);
                 free(temp_rank);
 
-                temp_rank = (rank_t*)qremove(rankqp, &find_highest_rank, &MAX_RANK);
+                temp_rank = (rank_t*)qremove(final_rank, &find_highest_rank, &MAX_RANK);
             }
+            j++;
             free(temp_rank);
         }
         // Free memory allocated for each element in the array
@@ -331,9 +461,10 @@ int main(void) {
 
         printf("> ");
     }
+
     // Free memory
     free(buffer);
-    qclose(rankqp);
+    qclose(final_rank);
     happly(htp, &free_h_elements);
     hclose(htp);
     exit(EXIT_SUCCESS);
