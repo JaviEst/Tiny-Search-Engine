@@ -344,7 +344,7 @@ queue_t* find_doc_rank(hashtable_t *htp, queue_t *rankqp, char *pagesdir, int id
 //------------------------------------------------------------------------
 int32_t check_arg(int argc, char** argv){
     // Check the number of input arguments is correct
-    if ( argc < 3 || argc > 4 ) {
+    if ( argc != 3 ) {
         printf("usage: query <pageDirectory> <indexFile> [-q]\n");
         return 1;
     }
@@ -360,7 +360,6 @@ int32_t check_arg(int argc, char** argv){
 
     return 0;
 }
-
 
 
 int main(int argc, char** argv) {
