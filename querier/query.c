@@ -67,9 +67,9 @@ typedef struct rank {
 // }
 
 //-------------------------------- find_max ---------------------------------
-// Description:   find highest rank in the queue
-// Inputs:        
-// Outputs:       
+// Description:   find highest rank in a given queue
+// Inputs:        void pointer to element in queue
+// Outputs:       assigns highest rank to global variable MAX_RANK
 //---------------------------------------------------------------------------
 void find_max(void *elementp) {
     rank_t *doc = (rank_t*)elementp;
@@ -80,9 +80,10 @@ void find_max(void *elementp) {
 }
 
 //----------------------- find_highest_rank ---------------------------------
-// Description:   find document with the highest rank
-// Inputs:        
-// Outputs:       
+// Description:   find document with highest rank
+// Inputs:        void pointer to element in queue and void pointer
+//                to key it should be compared to
+// Outputs:       returns true if rank is highest, false otherwise
 //---------------------------------------------------------------------------
 bool find_highest_rank(void *elementp, const void *keyp) {
     rank_t *doc = (rank_t*)elementp;
@@ -95,9 +96,10 @@ bool find_highest_rank(void *elementp, const void *keyp) {
 }
 
 //-------------------------- find_ranked_id ---------------------------------
-// Description:   find document with the highest rank
-// Inputs:        
-// Outputs:       
+// Description:   find document id associated with rank
+// Inputs:        void pointer to element in queue and void pointer
+//                to key it should be compared to
+// Outputs:       returns true if id found, false otherwise
 //---------------------------------------------------------------------------
 bool find_ranked_id(void *elementp, const void *keyp) {
     rank_t *doc = (rank_t*)elementp;
@@ -110,9 +112,9 @@ bool find_ranked_id(void *elementp, const void *keyp) {
 }
 
 //---------------------------- free_h_elements ------------------------------
-// Description:   Free the memory allocates to the elements in the hashtable
-// Inputs:        void pointer to the element 
-// Outputs:       frees memory allocated to the elements
+// Description:   frees memory allocated to elements in hashtable
+// Inputs:        void pointer to element 
+// Outputs:       frees memory allocated to each element
 //---------------------------------------------------------------------------
 void free_h_elements(void *elementp) {
     word_t *word = (word_t*)elementp;
@@ -132,9 +134,9 @@ void free_h_elements(void *elementp) {
 }
 
 //---------------------------- free_ranked_array ----------------------------
-// Description:   Free the memory allocates to the sorted array
-// Inputs:        sorted array of ranked docs & number of ranked docs in the array 
-// Outputs:       frees memory allocated to the elements and array
+// Description:   frees memory allocatef to sorted array
+// Inputs:        sorted array of ranked docs & number of ranked docs in array 
+// Outputs:       frees memory allocated to each element and array itself
 //---------------------------------------------------------------------------
 void free_array(char **array, int num_elements) {
     int j;
@@ -148,7 +150,7 @@ void free_array(char **array, int num_elements) {
 //------------------------------ get_doc_url --------------------------------
 // Description:   get url from id files
 // Inputs:        filepath
-// Outputs:       returns the url for the file given / returns null otherwise
+// Outputs:       returns the url for the file given, null otherwise
 //---------------------------------------------------------------------------
 int32_t get_doc_url(char *url, char *filepath) {
     FILE *fp = fopen(filepath, "r");
@@ -229,8 +231,9 @@ char** parse_string(char** array_words, char *input, bool *flag, int *num_elemen
 
 //---------------------------- process_ands ---------------------------------
 // Description:   parses thru input query and returns <andsequence> 
-// Inputs:        query, and_sequence, pointer to number of words in query, iteration
-// Outputs:       array of strings, subarray of query if 'or' is found
+// Inputs:        query, AND sequence, pointer to number of words in 
+//                query, and iteration
+// Outputs:       array of strings, subarray of query if 'or' is found,
 //                NULL if there is an error
 //---------------------------------------------------------------------------
 char** process_ands(char **query, char **and_sequence, int num_words, int *iteration, int *num_elements) {
@@ -252,9 +255,12 @@ char** process_ands(char **query, char **and_sequence, int num_words, int *itera
 
 //---------------------------- find_doc_rank ---------------------------------
 // Description:   parses thru input query and finds ranks of documents 
-//                containing all the queried words
-// Inputs:       
-// Outputs:       queue of ranks and (number of elements in queue)
+//                containing all queried words
+// Inputs:        hashtable pointer, ranked queue pointer, directory of 
+//                crawled pages, document id, number of words,
+//                array of strings query, number of already ranked docs, 
+//                and presence of word flag 
+// Outputs:       queue of ranks and (number of elements in queue),
 //                NULL if there is an error
 //---------------------------------------------------------------------------
 queue_t* find_doc_rank(hashtable_t *htp, queue_t *rankqp, char *pagesdir, int id, 
@@ -331,9 +337,10 @@ queue_t* find_doc_rank(hashtable_t *htp, queue_t *rankqp, char *pagesdir, int id
 }
 
 //---------------------------- check_arg ---------------------------------
-// Description:   checking the inputs from the user are correct
-// Inputs:        argv / argc
-// Outputs:       0 if the input is correct nonzero if the input is 
+// Description:   check for correct user inputs
+// Inputs:        argc (number of inputs passed from command line) and
+//                argv (array of arguments from command line)
+// Outputs:       0 if the input is correct, nonzero otherwise
 //------------------------------------------------------------------------
 int32_t check_arg(int argc, char** argv){
     // Check the number of input arguments is correct
