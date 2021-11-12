@@ -45,12 +45,13 @@ void lqclose(lqueue_t *lqp) {
     // Destroy the mutex
     pthread_mutex_destroy(&lqp->lock);
     qclose(lqp->qp);
+    free(lqp);
 }
 
 //---------------------------- lqput -------------------------------
 // Description:   put element at end of locked queue
 // Inputs:        locked queue pointer and element to add to queue
-// Outputs:       returns 0 is successful, nonzero otherwise
+// Outputs:       returns 0 if successful, nonzero otherwise
 //------------------------------------------------------------------
 int32_t lqput(lqueue_t *lqp, void *elementp) {
     // Wait for ownership of locked queue
@@ -144,6 +145,7 @@ void lqconcat(lqueue_t *lq1p, lqueue_t *lq2p) {
     pthread_mutex_unlock(&lq1p->lock);
     pthread_mutex_unlock(&lq2p->lock);
 
-    // Destroy lock and free memory of second queue
-    lqclose(lq2p);
+    // Destroy lock and free memory of second locked queue
+    pthread_mutex_destroy(&lq2p->lock);
+    free(lq2p);
 }

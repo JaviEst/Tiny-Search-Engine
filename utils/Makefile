@@ -1,4 +1,4 @@
-CFLAGS=-Wall -pedantic -std=c11 -I../utils -L../lib -g -lpthread
+CFLAGS=-Wall -pedantic -std=c11 -I../utils -L../lib -g -lpthread -pthread 
 CC=gcc
 LIBS=-lm -lutils -lcurl
 
@@ -27,10 +27,10 @@ LHASH_OBJS:=$(patsubst %.c,%.o,$(TEST_LHASH_CFILES))
 
 OFILES=queue.o hash.o webpage.o pageio.o indexio.o query_indexer.o lqueue.o lhash.o
 
-all: $(OFILES)
-	 ar cr ../lib/libutils.a $(OFILES)
+# all: $(OFILES)
+# 	 ar cr ../lib/libutils.a $(OFILES)
 	 
-# all: $(LQUEUE_TARGETS) # $(LHASH_TARGETS) # test_indexio test_pageio_load $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
+all: $(LQUEUE_TARGETS) # $(LHASH_TARGETS) # test_indexio test_pageio_load $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
 
 $(LIST_TARGETS) : %: %.o list.o
 	$(CC) $(CFLAGS) $< list.o -o $@ 
@@ -38,8 +38,8 @@ $(LIST_TARGETS) : %: %.o list.o
 $(QUEUE_TARGETS) : %: %.o queue.o
 	$(CC) $(CFLAGS) $< queue.o -o $@ 
 
-$(LQUEUE_TARGETS) : %: %.o lqueue.o
-	$(CC) $(CFLAGS) $< lqueue.o -o $@ 
+$(LQUEUE_TARGETS) : %: %.o lqueue.o queue.o
+	$(CC) $(CFLAGS) $< lqueue.o queue.o -o $@ 
 
 $(HASH_TARGETS) : %: %.o hash.o queue.o
 	$(CC) $(CFLAGS) $< hash.o queue.o -o $@
@@ -54,7 +54,7 @@ $(LIST_OBJS) : %.o: %.c list.h
 $(QUEUE_OBJS) : %.o: %.c queue.h
 	$(CC) $(CFLAGS) -c $< 
 
-$(LQUEUE_OBJS) : %.o: %.c lqueue.h
+$(LQUEUE_OBJS) : %.o: %.c lqueue.h queue.h
 	$(CC) $(CFLAGS) -c $< 
 
 $(HASH_OBJS) : %.o: %.c hash.h queue.h
