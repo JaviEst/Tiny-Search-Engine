@@ -30,7 +30,7 @@ OFILES=queue.o hash.o webpage.o pageio.o indexio.o query_indexer.o lqueue.o lhas
 # all: $(OFILES)
 # 	 ar cr ../lib/libutils.a $(OFILES)
 	 
-all: $(LQUEUE_TARGETS) # $(LHASH_TARGETS) # test_indexio test_pageio_load $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
+all: $(LQUEUE_TARGETS) $(LHASH_TARGETS) # test_indexio test_pageio_load $(LIST_TARGETS) $(HASH_TARGETS) $(QUEUE_TARGETS)
 
 $(LIST_TARGETS) : %: %.o list.o
 	$(CC) $(CFLAGS) $< list.o -o $@ 
@@ -44,8 +44,8 @@ $(LQUEUE_TARGETS) : %: %.o lqueue.o queue.o
 $(HASH_TARGETS) : %: %.o hash.o queue.o
 	$(CC) $(CFLAGS) $< hash.o queue.o -o $@
 
-$(LHASH_TARGETS) : %: %.o lhash.o queue.o
-	$(CC) $(CFLAGS) $< lhash.o queue.o -o $@
+$(LHASH_TARGETS) : %: %.o lhash.o hash.o queue.o
+	$(CC) $(CFLAGS) $< lhash.o hash.o queue.o -o $@
 
 
 $(LIST_OBJS) : %.o: %.c list.h
@@ -60,7 +60,7 @@ $(LQUEUE_OBJS) : %.o: %.c lqueue.h queue.h
 $(HASH_OBJS) : %.o: %.c hash.h queue.h
 	$(CC) $(CFLAGS) -c $< 
 
-$(LHASH_OBJS) : %.o: %.c lhash.h queue.h
+$(LHASH_OBJS) : %.o: %.c lhash.h hash.h queue.h
 	$(CC) $(CFLAGS) -c $< 
 
 

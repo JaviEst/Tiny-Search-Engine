@@ -16,7 +16,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <pthread.h>
-#include "queue.h"
 #include "hash.h"
 
 typedef struct lhashtable {
@@ -50,6 +49,7 @@ void lhclose(lhashtable_t *lhtp) {
   // Destroy the mutex
   pthread_mutex_destroy(&lhtp->lock);
   hclose(lhtp->htp);
+  free(lhtp);
 }
 
 //---------------------------- lhput -------------------------------
